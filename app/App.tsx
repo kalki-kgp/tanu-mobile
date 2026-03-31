@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { StatusBar } from "expo-status-bar";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ConnectScreen } from "./src/screens/ConnectScreen";
 import { ChatScreen } from "./src/screens/ChatScreen";
@@ -35,13 +36,13 @@ export default function App() {
   if (!loaded) return null;
 
   return (
-    <>
+    <SafeAreaProvider>
       <StatusBar style="light" />
       {config ? (
         <ChatScreen config={config} onDisconnect={handleDisconnect} />
       ) : (
         <ConnectScreen onConnect={handleConnect} savedConfig={null} />
       )}
-    </>
+    </SafeAreaProvider>
   );
 }

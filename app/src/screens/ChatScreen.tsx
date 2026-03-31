@@ -3,10 +3,10 @@ import {
   View,
   FlatList,
   StyleSheet,
-  SafeAreaView,
   Text,
   TouchableOpacity,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatBubble } from "../components/ChatBubble";
 import { ChatInput } from "../components/ChatInput";
 import { StatusBar } from "../components/StatusBar";
@@ -20,6 +20,7 @@ interface Props {
 }
 
 export function ChatScreen({ config, onDisconnect }: Props) {
+  const insets = useSafeAreaInsets();
   const {
     messages,
     connected,
@@ -45,7 +46,7 @@ export function ChatScreen({ config, onDisconnect }: Props) {
   const isThinking = status === "thinking";
 
   return (
-    <SafeAreaView style={styles.safe}>
+    <View style={[styles.safe, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -92,13 +93,15 @@ export function ChatScreen({ config, onDisconnect }: Props) {
       />
 
       {/* Input */}
-      <ChatInput
-        onSend={sendMessage}
-        onInterrupt={interrupt}
-        isThinking={isThinking}
-        disabled={!connected}
-      />
-    </SafeAreaView>
+      <View style={{ paddingBottom: insets.bottom }}>
+        <ChatInput
+          onSend={sendMessage}
+          onInterrupt={interrupt}
+          isThinking={isThinking}
+          disabled={!connected}
+        />
+      </View>
+    </View>
   );
 }
 

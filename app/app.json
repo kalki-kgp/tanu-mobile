@@ -28,6 +28,9 @@
       ],
       "usesCleartextTraffic": true
     },
+    "plugins": [
+      "./plugins/withCleartextTraffic"
+    ],
     "web": {
       "favicon": "./assets/favicon.png"
     },

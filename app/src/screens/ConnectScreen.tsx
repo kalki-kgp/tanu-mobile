@@ -7,9 +7,11 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
-  SafeAreaView,
+  ScrollView,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TanuBridgeClient } from "../api/client";
+import { QRScanner } from "../components/QRScanner";
 import type { ConnectionConfig } from "../api/types";
 
 interface Props {
@@ -23,6 +25,8 @@ export function ConnectScreen({ onConnect, savedConfig }: Props) {
   const [token, setToken] = useState(savedConfig?.token || "");
   const [cwd, setCwd] = useState(savedConfig?.cwd || "~");
   const [checking, setChecking] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const handleConnect = async () => {
     if (!host.trim() || !token.trim()) {
@@ -55,11 +59,48 @@ export function ConnectScreen({ onConnect, savedConfig }: Props) {
     }
   };
 
+  const handleQRScanned = async (config: ConnectionConfig) => {
+    // Auto-fill the form
+    setHost(config.host);
+    setPort(config.port);
+    setToken(config.token);
+    setCwd(config.cwd);
+
+    // Try to auto-connect
+    try {
+      const client = new TanuBridgeClient(config);
+      const healthy = await client.healthCheck();
+      if (healthy) {
+        onConnect(config);
+        return;
+      }
+    } catch {}
+
+    Alert.alert(
+      "QR Scanned",
+      `Filled in connection details for ${config.host}:${config.port}. Hit Connect when ready.`
+    );
+  };
+
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
+    <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
         <Text style={styles.logo}>Tanu</Text>
         <Text style={styles.subtitle}>Connect to your Claude Code bridge</Text>
+
+        {/* QR Scan Button */}
+        <TouchableOpacity
+          style={styles.qrBtn}
+          onPress={() => setShowScanner(true)}
+        >
+          <Text style={styles.qrBtnText}>Scan QR Code</Text>
+        </TouchableOpacity>
+
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or enter manually</Text>
+          <View style={styles.dividerLine} />
+        </View>
 
         <View style={styles.form}>
           <Text style={styles.label}>Bridge Host (IP / hostname)</Text>
@@ -118,8 +159,14 @@ export function ConnectScreen({ onConnect, savedConfig }: Props) {
             <Text style={styles.connectText}>Connect</Text>
           )}
         </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+      </ScrollView>
+
+      <QRScanner
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onScanned={handleQRScanned}
+      />
+    </View>
   );
 }
 
@@ -129,7 +176,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#0A0A14",
   },
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 24,
     justifyContent: "center",
   },
@@ -144,7 +191,36 @@ const styles = StyleSheet.create({
     color: "#8888AA",
     fontSize: 14,
     textAlign: "center",
-    marginBottom: 32,
+    marginBottom: 24,
+  },
+  qrBtn: {
+    backgroundColor: "#1E1E2E",
+    paddingVertical: 16,
+    borderRadius: 14,
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#6C5CE7",
+    borderStyle: "dashed",
+  },
+  qrBtnText: {
+    color: "#6C5CE7",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 20,
+    gap: 12,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#2D2D44",
+  },
+  dividerText: {
+    color: "#555570",
+    fontSize: 12,
   },
   form: {
     marginBottom: 24,

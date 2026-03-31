@@ -1,6 +1,8 @@
 import { createServer, IncomingMessage, ServerResponse } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { randomBytes } from "crypto";
+import { networkInterfaces } from "os";
+import qrcode from "qrcode-terminal";
 import { SessionManager } from "./session.js";
 import type { MobileInbound, MobileOutbound } from "./types.js";
 
@@ -8,6 +10,21 @@ const PORT = parseInt(process.env.TANU_PORT || "4567", 10);
 const HOST = process.env.TANU_HOST || "0.0.0.0";
 const AUTH_TOKEN = process.env.TANU_AUTH_TOKEN || `tanu-${randomBytes(16).toString("base64url")}`;
 const DEFAULT_CWD = process.env.TANU_CWD || process.cwd();
+
+function getLanIP(): string {
+  const nets = networkInterfaces();
+  let fallback = "127.0.0.1";
+
+  // Prefer Tailscale (utun/tailscale interfaces, 100.x.x.x range)
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.internal || net.family !== "IPv4") continue;
+      if (net.address.startsWith("100.")) return net.address;
+      if (fallback === "127.0.0.1") fallback = net.address;
+    }
+  }
+  return fallback;
+}
 
 const sessions = new SessionManager();
 
@@ -44,7 +61,7 @@ function handleRequest(req: IncomingMessage, res: ServerResponse) {
 
   // Health check (no auth needed)
   if (path === "/health" && req.method === "GET") {
-    return json(res, 200, { status: "ok", version: "1.0.0" });
+    return json(res, 200, { status: "ok", version: "1.0.0", name: "tanu-bridge" });
   }
 
   // Everything else needs auth
@@ -90,7 +107,7 @@ const server = createServer(handleRequest);
 
 // --- WebSocket Server ---
 
-const wss = new WebSocketServer({ server, path: undefined });
+const wss = new WebSocketServer({ noServer: true });
 
 // Handle upgrade manually so we can route /ws/:sessionId
 server.on("upgrade", (req, socket, head) => {
@@ -118,11 +135,11 @@ server.on("upgrade", (req, socket, head) => {
   }
 
   wss.handleUpgrade(req, socket, head, (ws) => {
-    wss.emit("connection", ws, req, sessionId);
+    handleConnection(ws, sessionId);
   });
 });
 
-wss.on("connection", (ws: WebSocket, _req: IncomingMessage, sessionId: string) => {
+function handleConnection(ws: WebSocket, sessionId: string) {
   console.log(`[ws] client connected to session ${sessionId.slice(0, 8)}`);
 
   const send = (msg: MobileOutbound) => {
@@ -173,23 +190,32 @@ wss.on("connection", (ws: WebSocket, _req: IncomingMessage, sessionId: string) =
     sessions.removeListener(`message:${sessionId}`, onMessage);
     sessions.removeListener(`status:${sessionId}`, onStatus);
   });
-});
+}
 
 // --- Start ---
 
 server.listen(PORT, HOST, () => {
+  const lanIP = getLanIP();
+  const connectURL = `tanu://${lanIP}:${PORT}?token=${AUTH_TOKEN}&cwd=${encodeURIComponent(DEFAULT_CWD)}`;
+
   console.log("");
   console.log("========================================");
   console.log("  Tanu Bridge Server");
   console.log("========================================");
-  console.log(`  URL:   http://${HOST}:${PORT}`);
-  console.log(`  Token: ${AUTH_TOKEN}`);
-  console.log(`  CWD:   ${DEFAULT_CWD}`);
+  console.log(`  LAN IP: ${lanIP}`);
+  console.log(`  Port:   ${PORT}`);
+  console.log(`  Token:  ${AUTH_TOKEN}`);
+  console.log(`  CWD:    ${DEFAULT_CWD}`);
   console.log("========================================");
   console.log("");
-  console.log("Connect your mobile app using:");
-  console.log(`  http://<your-ip>:${PORT}?token=${AUTH_TOKEN}`);
+  console.log("  Scan this QR code with the Tanu app:");
   console.log("");
+  qrcode.generate(connectURL, { small: true }, (qr: string) => {
+    console.log(qr);
+    console.log("");
+    console.log(`  Or enter manually: ${lanIP}:${PORT}`);
+    console.log("");
+  });
 });
 
 // Graceful shutdown
