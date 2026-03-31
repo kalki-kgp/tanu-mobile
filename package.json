@@ -1,0 +1,14 @@
+{
+  "name": "tanu-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Talk to Claude Code from your phone",
+  "scripts": {
+    "bridge": "cd bridge && npm run dev",
+    "app": "cd app && npx expo start",
+    "ios": "cd app && npx expo start --ios",
+    "android": "cd app && npx expo start --android",
+    "setup": "cd bridge && npm install && cd ../app && npm install",
+    "typecheck": "cd bridge && npx tsc --noEmit && cd ../app && npx tsc --noEmit"
+  }
+}
